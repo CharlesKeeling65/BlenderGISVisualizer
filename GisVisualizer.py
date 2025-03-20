@@ -36,7 +36,7 @@ bl_info = {
     "author": "GIS Team",
     "version": (1, 0),
     "blender": (4, 1, 0),
-    "location": "View3D > Sidebar > 工具",
+    "location": "View3D > Sidebar > GIS可视化",
     "description": "导入并可视化GIS数据",
     "category": "3D View",
 }
@@ -635,7 +635,7 @@ class GIS_PT_Panel(Panel):
     bl_label = "GIS 可视化"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "工具"
+    bl_category = "GIS可视化"
 
     def draw(self, context: bpy.types.Context) -> None:
         """绘制面板UI
