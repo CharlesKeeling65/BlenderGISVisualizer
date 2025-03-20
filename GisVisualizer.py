@@ -513,6 +513,7 @@ class GIS_OT_ImportRaster(Operator):
         # --- TRANSLATE INSTANCE ---
         translate_instance = nodes.new(type="GeometryNodeTranslateInstances")
         translate_instance.location = (-100, 0)
+        translate_instance.inputs['Local Space'].default_value = False
         # --- SCALE INSTANCE ---
         scale_instance = nodes.new(type="GeometryNodeScaleInstances")
         scale_instance.location = (150, 0)
