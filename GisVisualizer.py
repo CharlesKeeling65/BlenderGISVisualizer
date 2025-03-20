@@ -1,9 +1,17 @@
-# gis_visualizer_41.py
+# -*- coding: utf-8 -*-
+"""
+@File    :   GisVisualizer.py
+@Time    :   2023/06/15
+@Author  :   Charles Keeling (Wang Yubo)
+@Version :   1.0
+@Desc    :   用于Blender中导入并可视化GIS数据的插件，支持矢量数据和栅格数据的处理和展示
+"""
 import math
 import os
 import tempfile
 import time
 from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import bpy
 import geopandas as gpd
@@ -22,6 +30,7 @@ from mathutils import Matrix, Vector
 from rasterio import features
 from shapely.geometry import MultiPolygon, Polygon
 
+# 插件信息
 bl_info = {
     "name": "GIS Visualizer",
     "author": "GIS Team",
@@ -34,6 +43,8 @@ bl_info = {
 
 
 class GisProps(PropertyGroup):
+    """GIS数据属性组，存储用户界面配置信息"""
+    
     # 矢量数据属性
     shp_path: StringProperty(
         name="矢量文件", subtype="FILE_PATH", description="选择SHP矢量文件"
@@ -95,11 +106,20 @@ class GisProps(PropertyGroup):
 
 
 class GIS_OT_ImportVector(Operator):
+    """导入矢量数据的操作器类"""
     bl_idname = "gis.import_vector"
     bl_label = "导入矢量数据"
     bl_options = {"REGISTER", "UNDO"}
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> Dict[str, str]:
+        """执行导入矢量数据的操作
+        
+        Args:
+            context: Blender的上下文对象
+            
+        Returns:
+            Dict[str, str]: 操作状态字典
+        """
         props = context.scene.gis_props
         if not props.shp_path or not os.path.exists(props.shp_path):
             self.report({"ERROR"}, "请选择有效的SHP文件")
@@ -116,11 +136,24 @@ class GIS_OT_ImportVector(Operator):
             self.report({"ERROR"}, f"矢量处理失败: {str(e)}")
             return {"CANCELLED"}
 
-    def get_field_names(self, gdf):
-        """获取并返回GeoDataFrame的所有字段名称"""
+    def get_field_names(self, gdf: gpd.GeoDataFrame) -> List[str]:
+        """获取并返回GeoDataFrame的所有字段名称
+        
+        Args:
+            gdf: GeoDataFrame数据对象
+            
+        Returns:
+            List[str]: 字段名称列表
+        """
         return list(gdf.columns)
 
-    def process_vector(self, context, props):
+    def process_vector(self, context: bpy.types.Context, props: GisProps) -> None:
+        """处理矢量数据，导入到Blender场景中
+        
+        Args:
+            context: Blender的上下文对象
+            props: GIS属性配置
+        """
         # 创建一个新的集合来存放矢量数据
         collection_name = os.path.basename(props.shp_path).split(".")[0]
         if collection_name in bpy.data.collections:
@@ -157,7 +190,25 @@ class GIS_OT_ImportVector(Operator):
                     )
             # 其他类型后续可添加支持
 
-    def create_polygon(self, collection, geom, row, idx, props, offset):
+    def create_polygon(
+        self, 
+        collection: bpy.types.Collection, 
+        geom: Union[Polygon, MultiPolygon], 
+        row: gpd.GeoSeries, 
+        idx: Union[int, str], 
+        props: GisProps, 
+        offset: Vector
+    ) -> None:
+        """根据几何数据创建Blender多边形对象
+        
+        Args:
+            collection: 目标集合对象
+            geom: 几何数据对象
+            row: GeoDataFrame的一行数据
+            idx: 对象索引
+            props: GIS属性配置
+            offset: 坐标偏移量
+        """
         # 获取名称
         if props.name_field and props.name_field in row:
             object_name = str(row[props.name_field])
@@ -239,11 +290,20 @@ class GIS_OT_ImportVector(Operator):
 
 
 class GIS_OT_ImportRaster(Operator):
+    """导入栅格数据的操作器类"""
     bl_idname = "gis.import_raster"
     bl_label = "导入栅格数据"
     bl_options = {"REGISTER", "UNDO"}
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> Dict[str, str]:
+        """执行导入栅格数据的操作
+        
+        Args:
+            context: Blender的上下文对象
+            
+        Returns:
+            Dict[str, str]: 操作状态字典
+        """
         props = context.scene.gis_props
         if not props.tif_path or not os.path.exists(props.tif_path):
             self.report({"ERROR"}, "请选择有效的TIF文件")
@@ -263,7 +323,13 @@ class GIS_OT_ImportRaster(Operator):
             traceback.print_exc()
             return {"CANCELLED"}
 
-    def process_raster(self, context, props):
+    def process_raster(self, context: bpy.types.Context, props: GisProps) -> None:
+        """处理栅格数据，导入到Blender场景中
+        
+        Args:
+            context: Blender的上下文对象
+            props: GIS属性配置
+        """
         # 创建一个新的集合来存放栅格数据
         collection_name = os.path.basename(props.tif_path).split(".")[0]
         if collection_name in bpy.data.collections:
@@ -296,7 +362,6 @@ class GIS_OT_ImportRaster(Operator):
                 offset_y = 0
 
             # 计算像素分辨率
-
             res_x, res_y = transform.a, abs(transform.e)
             cell_size = res_x * (1 - props.gap_size)
             # half_cell = cell_size * 0.5
@@ -348,7 +413,19 @@ class GIS_OT_ImportRaster(Operator):
             )
 
 
-    def setup_geometry_nodes(self, obj, cell_size, props):
+    def setup_geometry_nodes(
+        self, 
+        obj: bpy.types.Object, 
+        cell_size: float, 
+        props: GisProps
+    ) -> None:
+        """设置几何节点系统用于可视化栅格数据
+        
+        Args:
+            obj: 栅格点云对象
+            cell_size: 栅格单元大小
+            props: GIS属性配置
+        """
         # 创建新节点组并强制清理旧数据
         node_group_name = f"GN_RasterViz_{obj.name}"
         if node_group_name in bpy.data.node_groups:
@@ -440,6 +517,8 @@ class GIS_OT_ImportRaster(Operator):
         scale_instance = nodes.new(type="GeometryNodeScaleInstances")
         scale_instance.location = (150, 0)
         scale_instance.inputs["Scale"].default_value = (1, 1, 1)
+        # 关闭缩放实例的局部空间选项
+        scale_instance.inputs['Local Space'].default_value = False
 
         realize = nodes.new("GeometryNodeRealizeInstances")
         realize.location = (-200, 0)
@@ -486,18 +565,25 @@ class GIS_OT_ImportRaster(Operator):
         gn_mod = obj.modifiers.new("GeometryNodes", "NODES")
         gn_mod.node_group = node_group
         gn_mod["Input_2"] = obj  # 设置输入几何体为点云数据
-        gn_mod["Input_3"] = props.height_scale
+        gn_mod["Input_3"] = props.raster_scale
         gn_mod["Input_4"] = cell_size
 
 
-
-
 class GIS_OT_LoadAttributes(Operator):
+    """加载属性字段的操作器类"""
     bl_idname = "gis.load_attributes"
     bl_label = "加载属性字段"
     bl_options = {"REGISTER", "UNDO"}
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> Dict[str, str]:
+        """执行加载属性字段操作
+        
+        Args:
+            context: Blender的上下文对象
+            
+        Returns:
+            Dict[str, str]: 操作状态字典
+        """
         props = context.scene.gis_props
         if not props.shp_path or not os.path.exists(props.shp_path):
             self.report({"ERROR"}, "请选择有效的SHP文件")
@@ -519,11 +605,20 @@ class GIS_OT_LoadAttributes(Operator):
 
 
 class GIS_OT_OptimizeMemory(Operator):
+    """优化内存使用的操作器类"""
     bl_idname = "gis.optimize_memory"
     bl_label = "优化内存使用"
     bl_options = {"REGISTER", "UNDO"}
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> Dict[str, str]:
+        """执行内存优化操作
+        
+        Args:
+            context: Blender的上下文对象
+            
+        Returns:
+            Dict[str, str]: 操作状态字典
+        """
         try:
             # 收集垃圾
             bpy.ops.outliner.orphans_purge(do_recursive=True)
@@ -535,12 +630,18 @@ class GIS_OT_OptimizeMemory(Operator):
 
 
 class GIS_PT_Panel(Panel):
+    """GIS可视化工具面板类"""
     bl_label = "GIS 可视化"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "工具"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """绘制面板UI
+        
+        Args:
+            context: Blender的上下文对象
+        """
         layout = self.layout
         props = context.scene.gis_props
 
@@ -602,7 +703,8 @@ class GIS_PT_Panel(Panel):
         row.operator("gis.optimize_memory", text="优化内存")
 
 
-def register():
+def register() -> None:
+    """注册插件类和属性"""
     bpy.utils.register_class(GisProps)
     bpy.utils.register_class(GIS_OT_ImportVector)
     bpy.utils.register_class(GIS_OT_ImportRaster)
@@ -612,7 +714,8 @@ def register():
     bpy.types.Scene.gis_props = PointerProperty(type=GisProps)
 
 
-def unregister():
+def unregister() -> None:
+    """注销插件类和属性"""
     bpy.utils.unregister_class(GIS_PT_Panel)
     bpy.utils.unregister_class(GIS_OT_OptimizeMemory)
     bpy.utils.unregister_class(GIS_OT_LoadAttributes)
