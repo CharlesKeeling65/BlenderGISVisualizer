@@ -1,0 +1,8 @@
+# GisVisualizer.py所需的Python库
+bpy>=4.1.0  # Blender Python API
+geopandas>=0.10.0  # 用于地理空间数据处理
+numpy>=1.20.0  # 数值计算
+rasterio>=1.2.0  # 栅格数据处理
+mathutils>=3.3.0  # Blender数学工具
+shapely>=1.8.0  # 几何操作库
+pyproj>=3.2.0  # 坐标转换库
